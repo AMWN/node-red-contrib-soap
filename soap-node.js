@@ -10,9 +10,9 @@ module.exports = function (RED) {
         this.payload = n.payload;
         var node = this;
         this.status({});
-
-        try {
-            node.on('input', function (msg) {
+        
+        node.on('input', function (msg, send, done) {
+            try {
                 var server = (msg.server)?{wsdl:msg.server, auth:0}:node.server;
                 var lastFiveChar = server.wsdl.substr(server.wsdl.length-5);
                 if(server.wsdl.indexOf("://")>0 && lastFiveChar !== '?wsdl'){
@@ -21,7 +21,7 @@ module.exports = function (RED) {
                 soap.createClient(server.wsdl, msg.options||{}, function (err, client) {
                     if (err) {
                         node.status({fill: "red", shape: "dot", text: "WSDL Config Error: " + err});
-                        node.error("WSDL Config Error: " + err);
+                        done("WSDL Config Error: " + err);
                         return;
                     }
                     switch (node.server.auth) {
@@ -47,23 +47,25 @@ module.exports = function (RED) {
                         client[node.method](msg.payload, function (err, result) {
                             if (err) {
                                 node.status({fill: "red", shape: "dot", text: "Service Call Error: " + err});
-                                node.error("Service Call Error: " + err);
+                                done("Service Call Error: " + err);
                                 return;
                             }
                             node.status({fill:"green", shape:"dot", text:"SOAP result received"});
                             msg.payload = result;
-                            node.send(msg);
+                            send(msg);
+                            done();
                         });
                     } else {
                         node.status({fill:"red", shape:"dot", text:"Method does not exist"});
-                        node.error("Method does not exist!");
+                        done("Method does not exist!");
                     };
                 });
-            });
-        } catch (err) {
-            node.status({fill: "red", shape: "dot", text: err.message});
-            node.error(err.message);
-        }
+            } catch (err) {
+                node.status({fill: "red", shape: "dot", text: err.message});
+                done(err.message);
+            }
+        });
+
     }
     RED.nodes.registerType("soap request", SoapCall);
 };
